@@ -2,9 +2,11 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"main/service"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -43,6 +45,7 @@ func (s *Server) handleUniversities(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) {
 	log.Print("Handling university by name", r)
+
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -55,16 +58,28 @@ func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	university, ok := s.svc.GetByName(name)
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
+	escapedName := url.QueryEscape(name)
+
+	resp, err := http.Get(
+		"http://pythonapi:8000/data_ars?data=" + escapedName,
+	)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("read python response error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(university)
-}
+	log.Println("Python response:", string(body))
 
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"python": json.RawMessage(body),
+	})
+}
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

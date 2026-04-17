@@ -1,13 +1,18 @@
 services:
   golangapi:
     build:
-      context: ./golangAPI
+      context: golangAPI
       dockerfile: Dockerfile
-
     ports:
       - "8080:8080"
-
     volumes:
       - ./golangAPI/data.csv:/app/data.csv
+    restart: unless-stopped
 
+  pythonapi:
+    build:
+      context: pythonAPI
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     restart: unless-stopped

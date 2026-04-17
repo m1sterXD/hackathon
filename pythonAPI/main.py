@@ -13,15 +13,12 @@ app.add_middleware(
     max_age=3600,
 )
 
-model = joblib.load('')
+# model = joblib.load('')
 data = {}
 
 @app.get("/data_ars")
 async def root(data):
-    data['data_ars'] = data
-    print('was succesfully used')
-    print(data)
-    return {"message":"success"}
+    return {"message":data}
 
 @app.post("/predict")
 def predict(data: dict):
