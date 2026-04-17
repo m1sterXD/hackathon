@@ -21,6 +21,7 @@ func (s *Server) Run() error {
 
 	mux.HandleFunc("/universities", s.handleUniversities)
 	mux.HandleFunc("/universities/", s.handleUniversityByName)
+	mux.HandleFunc("/metrics", s.handleMetrics)
 
 	return http.ListenAndServe(":8080", corsMiddleware(mux))
 }
@@ -67,6 +68,28 @@ func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(uni)
 }
 
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req service.MetricsRequest
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	avg := calculateAverage(req)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"average": avg,
+	})
+}
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -74,7 +97,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 
-		// ЛОВИМ ВСЕ preflight
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -82,4 +104,32 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+func calculateAverage(m service.MetricsRequest) float64 {
+	values := []float64{
+		m.F1.AcademicSelectivity,
+		m.F1.OlympiadElite,
+		m.F1.CompetitionPressure,
+
+		m.F2.FinancialCapacity,
+		m.F2.FacultyQuality,
+		m.F2.TeachingIntensity,
+		m.F2.ProgramDepth,
+
+		m.F3.EmployerTrust,
+		m.F3.IndustrySpread,
+		m.F3.PremiumSegment,
+
+		m.F4.Recognition,
+		m.F4.SubjectStrength,
+		m.F4.StaffIntl,
+		m.F4.StudentIntl,
+	}
+
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+
+	return sum / float64(len(values))
 }

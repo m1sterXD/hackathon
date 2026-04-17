@@ -22,6 +22,12 @@ type University struct {
 	Metrics Metrics
 }
 
+type MetricsRequest struct {
+	F1 HumanCapital `json:"f1"`
+	F2 Institution  `json:"f2"`
+	F3 Market       `json:"f3"`
+	F4 Global       `json:"f4"`
+}
 type Metrics struct {
 	F1 HumanCapital
 	F2 Institution
