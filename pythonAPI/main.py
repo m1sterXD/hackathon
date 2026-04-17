@@ -13,12 +13,14 @@ app.add_middleware(
     max_age=3600,
 )
 
-# model = joblib.load('')
+model = joblib.load('model_ridge.pkl')
 data = {}
 
 @app.get("/data_ars")
-async def root(data):
+async def root(inner_data):
+    data['params'] = inner_data['features']
     return {"message":data}
+
 
 @app.post("/predict")
 def predict(data: dict):
