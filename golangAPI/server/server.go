@@ -2,11 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"io"
 	"log"
 	"main/service"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -58,28 +56,17 @@ func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	escapedName := url.QueryEscape(name)
-
-	resp, err := http.Get(
-		"http://pythonapi:8000/data_ars?data=" + escapedName,
-	)
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("read python response error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	uni, isExist := s.svc.GetByName(name)
+	if !isExist {
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	log.Println("Python response:", string(body))
-
 	w.Header().Set("Content-Type", "application/json")
 
-	json.NewEncoder(w).Encode(map[string]any{
-		"python": json.RawMessage(body),
-	})
+	json.NewEncoder(w).Encode(uni)
 }
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
