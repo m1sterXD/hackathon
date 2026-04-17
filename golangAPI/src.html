@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Universities Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 6px;
+            margin-right: 10px;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Universities API Test</h1>
+
+<button onclick="loadNames()">Get All Names</button>
+
+<h3>Get by name</h3>
+<input id="nameInput" placeholder="Enter university name" />
+<button onclick="loadByName()">Fetch</button>
+
+<h3>Result:</h3>
+<pre id="output"></pre>
+
+<script>
+    const API = "https://tambra-vitrifiable-jonnie.ngrok-free.dev";
+
+    async function loadNames() {
+        const res = await fetch(`${API}/universities`);
+        const data = await res.json();
+        document.getElementById("output").textContent =
+            JSON.stringify(data, null, 2);
+    }
+
+    async function loadByName() {
+        const name = document.getElementById("nameInput").value;
+
+        const res = await fetch(`${API}/universities/${encodeURIComponent(name)}`);
+
+        if (!res.ok) {
+            document.getElementById("output").textContent =
+                "Error: " + res.status;
+            return;
+        }
+
+        const data = await res.json();
+        document.getElementById("output").textContent =
+            JSON.stringify(data, null, 2);
+    }
+</script>
+
+</body>
+</html>
