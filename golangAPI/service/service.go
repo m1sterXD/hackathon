@@ -3,63 +3,49 @@ package service
 import (
 	"encoding/csv"
 	"io"
+	"log"
 	"os"
 	"strconv"
 )
 
+const expectedFields = 16
+
 type Service struct {
 	path string
-	data map[string]University
+	data map[int64]University
 }
 
+type INNPair struct {
+	INN        int64      `json:"inn"`
+	University University `json:"university"`
+}
 type University struct {
-	Id   string
-	Name string
+	ExtendedRank int
+	NameShort    string
+	Name         string
+	INN          string
+	Country      string
+	Profile      string
 
-	Lat float64
-	Lon float64
+	InTraining bool
+
+	ActualScore     float64
+	ActualRank      int
+	PredictedScore  float64
+	ScoreNormalized float64
 
 	Metrics Metrics
 }
 
-type MetricsRequest struct {
-	F1 HumanCapital `json:"f1"`
-	F2 Institution  `json:"f2"`
-	F3 Market       `json:"f3"`
-	F4 Global       `json:"f4"`
-}
 type Metrics struct {
-	F1 HumanCapital
-	F2 Institution
-	F3 Market
-	F4 Global
+	F1 float64
+	F2 float64
+	F3 float64
+	F4 float64
+	F5 float64
 }
 
-type HumanCapital struct {
-	AcademicSelectivity float64
-	OlympiadElite       float64
-	CompetitionPressure float64
-}
-
-type Institution struct {
-	FinancialCapacity float64
-	FacultyQuality    float64
-	TeachingIntensity float64
-	ProgramDepth      float64
-}
-
-type Market struct {
-	EmployerTrust  float64
-	IndustrySpread float64
-	PremiumSegment float64
-}
-
-type Global struct {
-	Recognition     float64
-	SubjectStrength float64
-	StaffIntl       float64
-	StudentIntl     float64
-}
+type MetricsRequest Metrics
 
 func NewService(path string) *Service {
 	return &Service{
@@ -79,8 +65,23 @@ func (s *Service) loadData(path string) error {
 	defer file.Close()
 
 	reader := csv.NewReader(file)
+	reader.Comma = '\t' // если табы
+	reader.FieldsPerRecord = -1
+	reader.LazyQuotes = true
 
-	s.data = make(map[string]University)
+	s.data = make(map[int64]University)
+
+	// 🔥 ПРОПУСК HEADER
+	_, err = reader.Read()
+	if err != nil {
+		return err
+	}
+	_, err = reader.Read()
+	if err != nil {
+		return err
+	}
+
+	line := 0
 
 	for {
 		record, err := reader.Read()
@@ -88,65 +89,119 @@ func (s *Service) loadData(path string) error {
 			if err == io.EOF {
 				break
 			}
-			return err
+			log.Println("read error:", err)
+			continue
 		}
 
-		u := parseLine(record)
-		s.data[u.Name] = u
+		line++
+
+		// 🔥 ЖЁСТКАЯ ПРОВЕРКА
+		if len(record) != expectedFields {
+			log.Printf("skip line %d: expected %d fields, got %d\n", line, expectedFields, len(record))
+			continue
+		}
+
+		u, ok := parseLine(record)
+		if !ok {
+			log.Printf("skip line %d: parse error\n", line)
+			continue
+		}
+
+		key := mustINN(record[3])
+		if key == 0 {
+			log.Printf("skip line %d: invalid INN\n", line)
+			continue
+		}
+
+		s.data[key] = u
 	}
 
 	return nil
 }
-
-func parseLine(f []string) University {
+func parseLine(f []string) (University, bool) {
 	return University{
-		Id:   f[0],
-		Name: f[1],
+		ExtendedRank: mustAtoi(f[0]),
+		NameShort:    f[1],
+		Name:         f[2],
+		INN:          f[3],
+		Country:      f[4],
+		Profile:      f[5],
 
-		Lat: atof(f[2]),
-		Lon: atof(f[3]),
+		InTraining: atob(f[6]),
+
+		ActualScore:     mustAtof(f[7]),
+		ActualRank:      mustAtoi(f[8]),
+		PredictedScore:  mustAtof(f[9]),
+		ScoreNormalized: mustAtof(f[10]),
 
 		Metrics: Metrics{
-			F1: HumanCapital{
-				AcademicSelectivity: atof(f[4]),
-				OlympiadElite:       atof(f[5]),
-				CompetitionPressure: atof(f[6]),
-			},
-			F2: Institution{
-				FinancialCapacity: atof(f[7]),
-				FacultyQuality:    atof(f[8]),
-				TeachingIntensity: atof(f[9]),
-				ProgramDepth:      atof(f[10]),
-			},
-			F3: Market{
-				EmployerTrust:  atof(f[11]),
-				IndustrySpread: atof(f[12]),
-				PremiumSegment: atof(f[13]),
-			},
-			F4: Global{
-				Recognition:     atof(f[14]),
-				SubjectStrength: atof(f[15]),
-				StaffIntl:       atof(f[16]),
-				StudentIntl:     atof(f[17]),
-			},
+			F1: mustAtof(f[11]),
+			F2: mustAtof(f[12]),
+			F3: mustAtof(f[13]),
+			F4: mustAtof(f[14]),
+			F5: mustAtof(f[15]),
 		},
-	}
+	}, true
 }
 
-func atof(s string) float64 {
-	v, _ := strconv.ParseFloat(s, 64)
+func mustAtof(s string) float64 {
+	if s == "" {
+		return 0
+	}
+
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Println("float parse error:", s)
+		return 0
+	}
 	return v
 }
 
-func (s *Service) GetAllNames() []string {
-	names := make([]string, 0, len(s.data))
-	for _, d := range s.data {
-		names = append(names, d.Name)
+func mustAtoi(s string) int {
+	if s == "" {
+		return 0
 	}
-	return names
+
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Println("int parse error:", s)
+		return 0
+	}
+	return int(f)
 }
 
-func (s *Service) GetByName(name string) (University, bool) {
-	u, ok := s.data[name]
+func mustINN(s string) int64 {
+	if s == "" {
+		return 0
+	}
+
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Println("INN parse error:", s)
+		return 0
+	}
+
+	return int64(f)
+}
+
+func atob(s string) bool {
+	return s == "1" || s == "true" || s == "TRUE"
+}
+
+func (s *Service) GetAllINNs() []INNPair {
+	result := make([]INNPair, 0, len(s.data))
+
+	for k, v := range s.data {
+		result = append(result, INNPair{
+			INN:        k,
+			University: v,
+		})
+	}
+
+	return result
+}
+
+func (s *Service) GetByINN(inn int64) (University, bool) {
+	u, ok := s.data[inn]
 	return u, ok
 }

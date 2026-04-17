@@ -1,15 +1,28 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"log"
 	"main/service"
 	"net/http"
-	"strings"
 )
 
 type Server struct {
 	svc *service.Service
+}
+
+type MetricsRequest struct {
+	F1 float64 `json:"f1"`
+	F2 float64 `json:"f2"`
+	F3 float64 `json:"f3"`
+	F4 float64 `json:"f4"`
+	F5 float64 `json:"f5"`
+}
+
+type SearchRequest struct {
+	INN int64 `json:"inn"`
 }
 
 func NewServer(svc *service.Service) *Server {
@@ -20,8 +33,8 @@ func (s *Server) Run() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/universities", s.handleUniversities)
-	mux.HandleFunc("/universities/", s.handleUniversityByName)
-	mux.HandleFunc("/metrics", s.handleMetrics)
+	mux.HandleFunc("/post", s.handleUniversitySearch)
+	mux.HandleFunc("/forteen", s.handle14feats)
 
 	return http.ListenAndServe(":8080", corsMiddleware(mux))
 }
@@ -33,7 +46,7 @@ func (s *Server) handleUniversities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := s.svc.GetAllNames()
+	data := s.svc.GetAllINNs()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -42,51 +55,107 @@ func (s *Server) handleUniversities(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) {
-	log.Print("Handling university by name", r)
+func (s *Server) handle14feats(w http.ResponseWriter, r *http.Request) {
+	log.Print("handle14feats")
 
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	name := strings.TrimPrefix(r.URL.Path, "/universities/")
-
-	if name == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	uni, isExist := s.svc.GetByName(name)
-	if !isExist {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(uni)
-}
-
-func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	var req service.MetricsRequest
+	// читаем входной JSON
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
 
+	// пробрасываем в python
+	resp, err := http.Post(
+		"http://pythonapi:8000/data_ars_forteen",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		log.Println("python request error:", err)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("python read error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(resp.StatusCode)
+	w.Write(respBody)
+}
+func (s *Server) handleUniversitySearch(w http.ResponseWriter, r *http.Request) {
+	log.Print("Handling university search")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req SearchRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	avg := calculateAverage(req)
+	uni, ok := s.svc.GetByINN(req.INN)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	reqToPython := MetricsRequest{
+		F1: uni.Metrics.F1,
+		F2: uni.Metrics.F2,
+		F3: uni.Metrics.F3,
+		F4: uni.Metrics.F4,
+		F5: uni.Metrics.F5,
+	}
+
+	payload, err := json.Marshal(reqToPython)
+	if err != nil {
+		log.Println("marshal error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := http.Post(
+		"http://pythonapi:8000/data_ars",
+		"application/json",
+		bytes.NewBuffer(payload),
+	)
+	if err != nil {
+		log.Println("python request error:", err)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("python read error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
+
 	json.NewEncoder(w).Encode(map[string]any{
-		"average": avg,
+		"university": uni,
+		"python":     json.RawMessage(body),
 	})
 }
 
@@ -104,32 +173,4 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-}
-func calculateAverage(m service.MetricsRequest) float64 {
-	values := []float64{
-		m.F1.AcademicSelectivity,
-		m.F1.OlympiadElite,
-		m.F1.CompetitionPressure,
-
-		m.F2.FinancialCapacity,
-		m.F2.FacultyQuality,
-		m.F2.TeachingIntensity,
-		m.F2.ProgramDepth,
-
-		m.F3.EmployerTrust,
-		m.F3.IndustrySpread,
-		m.F3.PremiumSegment,
-
-		m.F4.Recognition,
-		m.F4.SubjectStrength,
-		m.F4.StaffIntl,
-		m.F4.StudentIntl,
-	}
-
-	sum := 0.0
-	for _, v := range values {
-		sum += v
-	}
-
-	return sum / float64(len(values))
 }

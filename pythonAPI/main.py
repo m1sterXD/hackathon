@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import joblib
+from pydantic import BaseModel
+from typing import List
 
 app = FastAPI()
 
@@ -15,10 +17,41 @@ app.add_middleware(
 
 # model = joblib.load('')
 data = {}
+class MetricsRequest(BaseModel):
+    f1: float
+    f2: float
+    f3: float
+    f4: float
+    f5: float
 
-@app.get("/data_ars")
-async def root(data):
-    return {"message":data}
+@app.post("/data_ars")
+def root(data: MetricsRequest):
+    return {
+        "received": data.dict()
+    }
+
+class Features14(BaseModel):
+    f1: float
+    f2: float
+    f3: float
+    f4: float
+    f5: float
+    f6: float
+    f7: float
+    f8: float
+    f9: float
+    f10: float
+    f11: float
+    f12: float
+    f13: float
+    f14: float
+
+@app.post("/data_ars_forteen")
+def root(data: List[Features14]):
+    return {
+        "count": len(data),
+        "first": data[0].dict()
+    }
 
 @app.post("/predict")
 def predict(data: dict):
