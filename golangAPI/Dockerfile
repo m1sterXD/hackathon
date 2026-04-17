@@ -8,7 +8,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # потом код
-COPY . .
+COPY delpoy .
 
 # собираем бинарь
 RUN go build -o app ./main
