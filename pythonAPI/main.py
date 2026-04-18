@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import joblib
 from pydantic import BaseModel
 from typing import List
-from new import predict_score
+from predictor_direct import predict
 
 
 app = FastAPI()
@@ -71,7 +71,7 @@ def root(data: List[Features14] = Body(...)):
         item.f13, item.f14
     ]
 
-    result = predict_score(features)
+    result = predict(features)
 
     return {
         "score": float(result)
