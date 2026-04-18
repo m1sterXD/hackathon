@@ -74,11 +74,11 @@ def root(data: List[Features14] = Body(...)):
     result = predict(features)
 
     return {
-        "score": float(result)
+        "score": result
     }
 
 @app.post("/predict")
-def predict(data: dict):
+def predict_api(data: dict):
     return {"prediction": model.predict([data["features"]])[0]}
 
 if __name__ == "__main__":
