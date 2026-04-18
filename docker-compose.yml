@@ -7,7 +7,7 @@ services:
       - "8080:8080"
     restart: always
     environment:
-      GROQ_KEY: ${GROQ_KEY}
+      OPENROUTER_KEY: ${OPENROUTER_KEY}
 
   pythonapi:
     build:

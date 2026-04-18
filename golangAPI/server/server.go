@@ -3,13 +3,11 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"main/service"
 	"net/http"
 	"os"
-	"sort"
 )
 
 var GROQ_KEY = os.Getenv("GROQ_KEY")
@@ -151,83 +149,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
-	log.Println("handleAnalyze")
-
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req AnalyzeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// сортировка слабых метрик
-	type pair struct {
-		i int
-		v float64
-	}
-
-	var sorted []pair
-	for i, v := range req.Metrics {
-		sorted = append(sorted, pair{i, v})
-	}
-
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].v < sorted[j].v
-	})
-
-	weak := ""
-	for i := 0; i < 2 && i < len(sorted); i++ {
-		weak += fmt.Sprintf("F%d=%.1f ", sorted[i].i+1, sorted[i].v)
-	}
-
-	// формируем prompt
-	prompt := fmt.Sprintf(
-		`Ты аналитик рейтингов университетов.
-ВУЗ: "%s".
-Балл %.1f/100.
-Слабейшие: %s.
-Верни строго JSON: {"measures":[{"title":"до 5 слов","focus":"F1","action":"...","impact":"..."}]}`,
-		req.Name,
-		req.Score,
-		weak,
-	)
-
-	payload := map[string]any{
-		"model": "llama-3.3-70b-versatile",
-		"messages": []map[string]string{
-			{"role": "system", "content": "Отвечай только JSON без текста."},
-			{"role": "user", "content": prompt},
-		},
-		"temperature": 0.2,
-		"max_tokens":  800,
-	}
-
-	buf, _ := json.Marshal(payload)
-
-	httpReq, _ := http.NewRequest(
-		"POST",
-		"https://api.groq.com/openai/v1/chat/completions",
-		bytes.NewBuffer(buf),
-	)
-
-	httpReq.Header.Set("Authorization", "Bearer "+GROQ_KEY)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	GROQ_KEY = os.Getenv("OPENROUTER_KEY")
 	w.Write([]byte(GROQ_KEY))
 }
