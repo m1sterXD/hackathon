@@ -33,10 +33,9 @@ USER_COLS_ORDER = [
 
 def _fa_transform(fa, X):
     """Ручная трансформация через матрицу нагрузок."""
-    loadings = fa.loadings_                        # shape: (41, 5)
-    X_centered = X - X.mean(axis=0)               # центрирование
-    scores = X_centered @ loadings @ np.linalg.pinv(loadings.T @ loadings)
-    return scores
+    loadings = fa.loadings_  # shape: (41, 5)
+    return X @ loadings @ np.linalg.pinv(loadings.T @ loadings)
+
 
 
 def predict(values: List[float]) -> Dict[str, Any]:
@@ -109,10 +108,11 @@ if __name__ == "__main__":
         18,  # rnd_revenue_share
         2.5, 1.2,  # wos_pubs_per100_2021, grants_per_100_fac
         28,  # master_share
-        5,  # foreign_faculty_share
-        500,  # revenue_per_faculty
+        12,  # foreign_faculty_share
+        510,  # revenue_per_faculty
         45,  # modern_equipment_share
         3.2,  # postgrad_per_100
         45  # doct_share
     ]
     result = predict(bgu_values)
+    print(result)
