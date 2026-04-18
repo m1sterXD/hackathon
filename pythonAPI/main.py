@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi import Body
 from fastapi.middleware.cors import CORSMiddleware
 import joblib
 from pydantic import BaseModel
@@ -28,10 +29,18 @@ class MetricsRequest(BaseModel):
 
 @app.post("/data_ars")
 def root(data: MetricsRequest):
-    result = model.predict(data)
+    features = [
+        data.f1,
+        data.f2,
+        data.f3,
+        data.f4,
+        data.f5,
+    ]
+
+    result = model.predict([features])[0]
 
     return {
-        "score": result
+        "score": float(result)
     }
 
 
@@ -52,10 +61,20 @@ class Features14(BaseModel):
     f14: float
 
 @app.post("/data_ars_forteen")
-def root(data: List[Features14]):
+def root(data: List[Features14] = Body(...)):
+    item = data[0]
+
+    features = [
+        item.f1, item.f2, item.f3, item.f4,
+        item.f5, item.f6, item.f7, item.f8,
+        item.f9, item.f10, item.f11, item.f12,
+        item.f13, item.f14
+    ]
+
+    result = predict_score(features)
 
     return {
-        "score": predict_score(data)
+        "score": float(result)
     }
 
 @app.post("/predict")
