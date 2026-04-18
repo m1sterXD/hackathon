@@ -1,17 +1,28 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
 	"main/service"
 	"net/http"
-	"net/url"
-	"strings"
 )
 
 type Server struct {
 	svc *service.Service
+}
+
+type MetricsRequest struct {
+	F1 float64 `json:"f1"`
+	F2 float64 `json:"f2"`
+	F3 float64 `json:"f3"`
+	F4 float64 `json:"f4"`
+	F5 float64 `json:"f5"`
+}
+
+type SearchRequest struct {
+	INN int64 `json:"inn"`
 }
 
 func NewServer(svc *service.Service) *Server {
@@ -22,7 +33,8 @@ func (s *Server) Run() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/universities", s.handleUniversities)
-	mux.HandleFunc("/universities/", s.handleUniversityByName)
+	mux.HandleFunc("/post", s.handleUniversitySearch)
+	mux.HandleFunc("/forteen", s.handle14feats)
 
 	return http.ListenAndServe(":8080", corsMiddleware(mux))
 }
@@ -34,7 +46,7 @@ func (s *Server) handleUniversities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := s.svc.GetAllNames()
+	data := s.svc.GetAllINNs()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -43,43 +55,110 @@ func (s *Server) handleUniversities(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleUniversityByName(w http.ResponseWriter, r *http.Request) {
-	log.Print("Handling university by name", r)
+func (s *Server) handle14feats(w http.ResponseWriter, r *http.Request) {
+	log.Print("handle14feats")
 
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	name := strings.TrimPrefix(r.URL.Path, "/universities/")
-
-	if name == "" {
+	// читаем входной JSON
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	defer r.Body.Close()
 
-	escapedName := url.QueryEscape(name)
-
-	resp, err := http.Get(
-		"http://pythonapi:8000/data_ars?data=" + escapedName,
+	// пробрасываем в python
+	resp, err := http.Post(
+		"http://pythonapi:8000/data_ars_forteen",
+		"application/json",
+		bytes.NewBuffer(body),
 	)
+	if err != nil {
+		log.Println("python request error:", err)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("read python response error:", err)
+		log.Println("python read error:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	log.Println("Python response:", string(body))
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(resp.StatusCode)
+	w.Write(respBody)
+}
+func (s *Server) handleUniversitySearch(w http.ResponseWriter, r *http.Request) {
+	log.Print("Handling university search")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req SearchRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	uni, ok := s.svc.GetByINN(req.INN)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	reqToPython := MetricsRequest{
+		F1: uni.Metrics.F1,
+		F2: uni.Metrics.F2,
+		F3: uni.Metrics.F3,
+		F4: uni.Metrics.F4,
+		F5: uni.Metrics.F5,
+	}
+
+	payload, err := json.Marshal(reqToPython)
+	if err != nil {
+		log.Println("marshal error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := http.Post(
+		"http://pythonapi:8000/data_ars",
+		"application/json",
+		bytes.NewBuffer(payload),
+	)
+	if err != nil {
+		log.Println("python request error:", err)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("python read error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"python": json.RawMessage(body),
+		"university": uni,
+		"python":     json.RawMessage(body),
 	})
 }
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -87,7 +166,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 
-		// ЛОВИМ ВСЕ preflight
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

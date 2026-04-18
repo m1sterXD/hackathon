@@ -5,9 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-    volumes:
-      - ./golangAPI/data.csv:/app/data.csv
-    restart: unless-stopped
+    restart: always
 
   pythonapi:
     build:
@@ -15,4 +13,4 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    restart: always
