@@ -63,7 +63,6 @@ func (s *Server) handle14feats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// читаем входной JSON
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -96,6 +95,7 @@ func (s *Server) handle14feats(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 	w.Write(respBody)
 }
+
 func (s *Server) handleUniversitySearch(w http.ResponseWriter, r *http.Request) {
 	log.Print("Handling university search")
 
@@ -105,8 +105,7 @@ func (s *Server) handleUniversitySearch(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req SearchRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -117,46 +116,10 @@ func (s *Server) handleUniversitySearch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	reqToPython := MetricsRequest{
-		F1: uni.Metrics.F1,
-		F2: uni.Metrics.F2,
-		F3: uni.Metrics.F3,
-		F4: uni.Metrics.F4,
-		F5: uni.Metrics.F5,
-	}
-
-	payload, err := json.Marshal(reqToPython)
-	if err != nil {
-		log.Println("marshal error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := http.Post(
-		"http://pythonapi:8000/data_ars",
-		"application/json",
-		bytes.NewBuffer(payload),
-	)
-	if err != nil {
-		log.Println("python request error:", err)
-		w.WriteHeader(http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("python read error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 
-	json.NewEncoder(w).Encode(map[string]any{
-		"university": uni,
-		"python":     json.RawMessage(body),
-	})
+	// 🔥 ВОТ И ВСЁ — возвращаем полностью
+	json.NewEncoder(w).Encode(uni)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

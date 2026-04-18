@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-const expectedFields = 16
+const expectedFields = 37
 
 type Service struct {
 	path string
@@ -34,7 +34,37 @@ type University struct {
 	PredictedScore  float64
 	ScoreNormalized float64
 
-	Metrics Metrics
+	// --- старые метрики ---
+	F1 float64
+	F2 float64
+	F3 float64
+	F4 float64
+	F5 float64
+
+	// --- нормализованные ---
+	F1Norm float64
+	F2Norm float64
+	F3Norm float64
+	F4Norm float64
+	F5Norm float64
+
+	// --- остальные фичи ---
+	WosPubsPer100        float64
+	RndRevenueShare      float64
+	GrantsPer100Fac      float64
+	MasterShare          float64
+	ForeignFacultyShare  float64
+	EgeBudget            float64
+	EgePaid              float64
+	EgeMin               float64
+	VsoshPer100          float64
+	OlympPer100          float64
+	ForeignNonCisShare   float64
+	ForeignTotalShare    float64
+	RevenuePerFaculty    float64
+	ModernEquipmentShare float64
+	PostgradPer100       float64
+	DoctShare            float64
 }
 
 type Metrics struct {
@@ -134,13 +164,34 @@ func parseLine(f []string) (University, bool) {
 		PredictedScore:  mustAtof(f[9]),
 		ScoreNormalized: mustAtof(f[10]),
 
-		Metrics: Metrics{
-			F1: mustAtof(f[11]),
-			F2: mustAtof(f[12]),
-			F3: mustAtof(f[13]),
-			F4: mustAtof(f[14]),
-			F5: mustAtof(f[15]),
-		},
+		F1: mustAtof(f[11]),
+		F2: mustAtof(f[12]),
+		F3: mustAtof(f[13]),
+		F4: mustAtof(f[14]),
+		F5: mustAtof(f[15]),
+
+		F1Norm: mustAtof(f[16]),
+		F2Norm: mustAtof(f[17]),
+		F3Norm: mustAtof(f[18]),
+		F4Norm: mustAtof(f[19]),
+		F5Norm: mustAtof(f[20]),
+
+		WosPubsPer100:        mustAtof(f[21]),
+		RndRevenueShare:      mustAtof(f[22]),
+		GrantsPer100Fac:      mustAtof(f[23]),
+		MasterShare:          mustAtof(f[24]),
+		ForeignFacultyShare:  mustAtof(f[25]),
+		EgeBudget:            mustAtof(f[26]),
+		EgePaid:              mustAtof(f[27]),
+		EgeMin:               mustAtof(f[28]),
+		VsoshPer100:          mustAtof(f[29]),
+		OlympPer100:          mustAtof(f[30]),
+		ForeignNonCisShare:   mustAtof(f[31]),
+		ForeignTotalShare:    mustAtof(f[32]),
+		RevenuePerFaculty:    mustAtof(f[33]),
+		ModernEquipmentShare: mustAtof(f[34]),
+		PostgradPer100:       mustAtof(f[35]),
+		DoctShare:            mustAtof(f[36]),
 	}, true
 }
 
