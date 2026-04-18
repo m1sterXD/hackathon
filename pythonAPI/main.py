@@ -15,7 +15,7 @@ app.add_middleware(
     max_age=3600,
 )
 
-# model = joblib.load('')
+model = joblib.load('model_ridge.pkl')
 data = {}
 class MetricsRequest(BaseModel):
     f1: float
