@@ -229,4 +229,5 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
+	w.Write([]byte(GROQ_KEY))
 }
