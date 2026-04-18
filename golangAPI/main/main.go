@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	svc := service.NewService("data_extended.csv")
+	svc := service.NewService("data_extended_2.csv")
 	err := svc.Init()
 	if err != nil {
 		log.Fatal(err)
