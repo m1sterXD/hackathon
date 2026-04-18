@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import joblib
 from pydantic import BaseModel
 from typing import List
+from new import predict_score
+
 
 app = FastAPI()
 
@@ -26,9 +28,12 @@ class MetricsRequest(BaseModel):
 
 @app.post("/data_ars")
 def root(data: MetricsRequest):
+    result = model.predict(data)
+
     return {
-        "received": data.dict()
+        "score": result
     }
+
 
 class Features14(BaseModel):
     f1: float
@@ -48,9 +53,9 @@ class Features14(BaseModel):
 
 @app.post("/data_ars_forteen")
 def root(data: List[Features14]):
+
     return {
-        "count": len(data),
-        "first": data[0].dict()
+        "score": predict_score(data)
     }
 
 @app.post("/predict")
