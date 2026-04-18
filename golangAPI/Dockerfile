@@ -14,7 +14,7 @@ FROM alpine:latest
 WORKDIR /app
 
 COPY --from=builder /app/app .
-COPY data.csv .
+COPY data_extended.csv .
 
 EXPOSE 8080
 
